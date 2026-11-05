@@ -1,45 +1,44 @@
-# WhatsApp iOS & Web Toolkit
+# WhatsApp iOS Backup Toolkit and Live Bridge
 
-A comprehensive toolkit for WhatsApp:
-1. **Headless Web Bridge & Live Dashboard** (`bridge/`): Real-time live synchronization (under 50 MB disk space, zero USB cables needed), built-in web dashboard, and live voice note playback.
+This repository has two separate tools:
+
+1. **Headless Web Bridge & Live Dashboard** (`bridge/`): Captures new messages from a linked WhatsApp device and keeps a small local archive.
 2. **Local Backup Extractor** (`extract_whatsapp.py` & `extract_audio.py`): Offline extractor for unencrypted Finder backups.
 
 ---
 
-## 🚀 Headless Web Bridge (Recommended: Live & Zero Disk Space)
+## Headless Web Bridge
 
-This mode connects directly to WhatsApp Web's Multi-Device protocol. It bypasses iPhone backup size limits, uses less than **50 MB** of disk space, updates **in real-time** (every second), and lets you view your messages from any browser or phone.
+This experimental mode links as a WhatsApp Web device. It does not need an iPhone cable or Finder backup, but it is not zero-disk: the installed dependencies use about 54 MB, and the local database, linked-device credentials, and optional voice notes use additional space. The bridge stores the latest 5,000 message notifications; it does not import earlier chat history. Voice-note downloads are limited to 8 MiB each and 32 MiB total.
 
-### How to Run:
+Baileys is an unofficial WhatsApp Web client, not an official WhatsApp integration. It may disconnect or stop working when WhatsApp changes its protocol. New message delivery, older history, and access to locked chats are not guaranteed.
 
-1. **Start the bridge server**:
-   ```bash
-   cd /Users/katlego/work/Whatsapp/bridge
-   npm start
-   ```
+### Start the bridge
 
-2. **Link your device (one-time)**:
-   - A QR code will display directly in your Terminal.
-   - You can also open **`http://localhost:3000`** in any web browser to see the QR code on a screen.
-   - On your iPhone: Open **WhatsApp → Settings → Linked Devices → Link a Device**.
-   - Scan the QR code.
+Use Node.js 22.13 or later:
 
-3. **That's it!**:
-   - The connection is now persistent (you will **not** need to scan again on restarts).
-   - All incoming/outgoing texts and voice notes stream live into the dashboard.
-   - Built-in HTML5 player lets you listen to voice notes directly in your browser.
+```bash
+cd /Users/katlego/work/Whatsapp/bridge
+npm ci
+npm start
+```
 
-### Accessing the Dashboard from Anywhere:
+Scan the QR code in Terminal from **WhatsApp → Settings → Linked devices → Link a device**. Open <http://127.0.0.1:3000> on the Mac. New live message notifications appear in the dashboard; voice notes up to the stated limits can be played there. Other media is shown as a message placeholder.
 
-- **From any device on your Wi-Fi**: Open `http://<YOUR_MAC_IP>:3000` on your phone or laptop.
-- **From anywhere outside your home (Remote)**:
-  Run a free secure tunnel (like Cloudflare Tunnel or Tailscale):
-  ```bash
-  # Example using free Cloudflare quick tunnel:
-  brew install cloudflare/cloudflare/cloudflared
-  cloudflared tunnel --url http://localhost:3000
-  ```
-  This generates a secure `https://random-name.trycloudflare.com` URL you can open from anywhere in the world.
+Data is saved under `bridge/.data/`; linked-device credentials are saved under `bridge/auth_info/`. Both are ignored by Git. The dashboard listens only on the Mac by default. The Mac must be awake and connected for the bridge to receive messages.
+
+### Remote access
+
+Remote access is disabled by default. For access through a trusted encrypted VPN or HTTPS proxy, set a token before starting the bridge:
+
+```bash
+cd /Users/katlego/work/Whatsapp/bridge
+export BRIDGE_TOKEN="$(openssl rand -hex 32)"
+printf 'Bridge token: %s\n' "$BRIDGE_TOKEN"
+npm start
+```
+
+Keep the bridge bound to `127.0.0.1` when using a local tunnel or proxy; enter the token in the dashboard. To bind directly to a network interface, also set `BRIDGE_HOST=0.0.0.0`. The server refuses a non-local bind without a token. Use an encrypted VPN or HTTPS endpoint, and do not publish the dashboard without its token. A tunnel provider may handle the traffic that passes through its service.
 
 ---
 
@@ -173,5 +172,6 @@ QuickTime does not support `.opus` natively out of the box. You have three simpl
 
 ## Privacy & Security
 
-- **Local Only:** All processing is done offline on your computer. Nothing is sent over the network.
+- **Backup extractor:** Processing is local and offline once an iPhone backup is on your computer.
+- **Live bridge:** Connects to WhatsApp as a linked device. Recent messages, downloaded voice notes, and linked-device credentials are retained on the Mac. The dashboard is local-only unless you configure authenticated remote access.
 - **Git Safety:** `.gitignore` blocks databases (`*.sqlite`, `*.db`, `Manifest.db`), chat logs (`*.csv`, `*.json`), and audio files (`*.opus`, `*.m4a`, `VoiceNotes/`) from being tracked or committed to version control.

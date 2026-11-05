@@ -40,5 +40,6 @@ VoiceNotes/
 bridge/node_modules/
 bridge/auth_info/
 bridge/media/
+bridge/.data/
 bridge/*.db
 
