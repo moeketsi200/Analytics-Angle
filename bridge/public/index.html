@@ -248,6 +248,33 @@
       height: 250px;
       display: block;
     }
+    .access-panel {
+      display: none;
+      padding: 12px 20px;
+      background: #332c1d;
+      border-bottom: 1px solid #796332;
+      color: #f5e8c4;
+      font-size: 0.9rem;
+    }
+    .access-panel.visible { display: flex; align-items: center; gap: 10px; }
+    .access-panel input {
+      width: min(360px, 55vw);
+      padding: 8px 10px;
+      border: 1px solid #796332;
+      border-radius: 6px;
+      background: #17150f;
+      color: white;
+    }
+    .access-panel button {
+      padding: 8px 13px;
+      border: 0;
+      border-radius: 6px;
+      background: #35d39a;
+      color: #08251a;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .access-panel span { color: #d2c49e; font-size: 0.8rem; }
 
     @media (max-width: 768px) {
       .main-container { flex-direction: column; }
@@ -267,6 +294,13 @@
       <span id="statusText">Connecting...</span>
     </div>
   </header>
+
+  <div id="accessPanel" class="access-panel">
+    <label for="accessToken">Bridge access token</label>
+    <input id="accessToken" type="password" autocomplete="off" placeholder="Paste the token configured on the Mac">
+    <button id="connectButton" type="button">Connect</button>
+    <span>Token stays in this browser tab.</span>
+  </div>
 
   <div class="main-container">
     <!-- Sidebar -->
@@ -305,17 +339,33 @@
       <div class="qr-frame">
         <img id="qrImage" src="" alt="Scan QR Code">
       </div>
-      <p style="font-size: 0.8rem; color: #8696a0;">This connects your Mac directly to WhatsApp's servers without storing backups.</p>
+      <p style="font-size: 0.8rem; color: #8696a0;">The bridge keeps a limited local message archive. Do not share this QR code.</p>
     </div>
   </div>
 
   <script>
     let allChats = [];
     let activeJid = null;
+    let bridgeToken = sessionStorage.getItem('bridge-token') || '';
+
+    function authHeaders() {
+      return bridgeToken ? { Authorization: `Bearer ${bridgeToken}` } : {};
+    }
+
+    async function apiFetch(url) {
+      const response = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+      if (response.status === 401) {
+        document.getElementById('accessPanel').classList.add('visible');
+        throw new Error('Bridge access token required');
+      }
+      if (!response.ok) throw new Error(`Bridge request failed (${response.status})`);
+      document.getElementById('accessPanel').classList.remove('visible');
+      return response;
+    }
 
     async function loadStatus() {
       try {
-        const res = await fetch('/api/status');
+        const res = await apiFetch('/api/status');
         const data = await res.json();
         updateStatusUI(data.status, data.qr);
       } catch (e) {
@@ -331,7 +381,7 @@
 
       if (status === 'connected') {
         badge.className = 'badge badge-connected';
-        text.innerText = 'Connected (Live 24/7)';
+        text.innerText = 'Connected';
         qrModal.style.display = 'none';
       } else if (status === 'qr_ready') {
         badge.className = 'badge badge-waiting';
@@ -348,9 +398,9 @@
 
     async function loadChats() {
       try {
-        const res = await fetch('/api/chats');
+        const res = await apiFetch('/api/chats');
         allChats = await res.json();
-        renderChats(allChats);
+        filterChats();
       } catch (e) {
         console.error('Failed to load chats:', e);
       }
@@ -408,9 +458,10 @@
 
     async function loadMessages(jid) {
       try {
-        const res = await fetch('/api/messages/' + encodeURIComponent(jid));
+        const res = await apiFetch('/api/messages/' + encodeURIComponent(jid));
         const messages = await res.json();
         const container = document.getElementById('messagesContainer');
+        const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 40;
         container.innerHTML = '';
 
         for (const m of messages) {
@@ -419,7 +470,7 @@
 
           let mediaHtml = '';
           if (m.media_path && m.message_type === 'voice_note') {
-            mediaHtml = `<audio controls src="${m.media_path}" preload="none"></audio>`;
+            mediaHtml = `<audio controls preload="none" data-media="${escapeHtml(m.media_path)}"></audio>`;
           }
 
           const senderHtml = (!m.from_me && m.sender_name) 
@@ -433,8 +484,15 @@
             <div class="meta-time">${formatTime(m.timestamp)}</div>
           `;
           container.appendChild(bubble);
+          const audio = bubble.querySelector('audio[data-media]');
+          if (audio) {
+            apiFetch('/api/media/' + encodeURIComponent(audio.dataset.media))
+              .then(response => response.blob())
+              .then(blob => { audio.src = URL.createObjectURL(blob); })
+              .catch(() => { audio.hidden = true; });
+          }
         }
-        container.scrollTop = container.scrollHeight;
+        if (nearBottom) container.scrollTop = container.scrollHeight;
       } catch (e) {
         console.error('Failed to load messages:', e);
       }
@@ -445,32 +503,25 @@
         tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
     }
 
-    // Connect to Server-Sent Events (SSE) for Real-Time Streaming
-    function setupSSE() {
-      const evtSource = new EventSource('/api/events');
-
-      evtSource.addEventListener('status', (e) => {
-        const data = JSON.parse(e.data);
-        updateStatusUI(data.status, data.qr);
-      });
-
-      evtSource.addEventListener('new_message', (e) => {
-        const data = JSON.parse(e.data);
-        loadChats();
-        if (activeJid && data.chatJid === activeJid) {
-          loadMessages(activeJid);
-        }
-      });
-
-      evtSource.onerror = () => {
-        setTimeout(setupSSE, 5000);
-      };
+    async function refreshDashboard() {
+      await loadStatus();
+      await loadChats();
+      if (activeJid) await loadMessages(activeJid);
     }
 
-    // Initial boot
-    loadStatus();
-    loadChats();
-    setupSSE();
+    document.getElementById('connectButton').addEventListener('click', () => {
+      bridgeToken = document.getElementById('accessToken').value.trim();
+      sessionStorage.setItem('bridge-token', bridgeToken);
+      refreshDashboard();
+    });
+    document.getElementById('accessToken').addEventListener('keydown', event => {
+      if (event.key === 'Enter') document.getElementById('connectButton').click();
+    });
+
+    // Polling keeps the remote dashboard authenticated without putting the token in a URL.
+    refreshDashboard();
+    window.setInterval(refreshDashboard, 3000);
   </script>
 </body>
 </html>
+
