@@ -2,6 +2,7 @@
 """
 WhatsApp iOS Local Backup Extractor
 Extracts chat logs from an unencrypted iPhone backup on macOS or a local ChatStorage.sqlite file.
+Supports text messages, voice notes, photos, videos, and media placeholders.
 """
 
 import argparse
@@ -67,8 +68,12 @@ def get_connection(db_path):
 
 def show_stats(conn):
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM ZWAMESSAGE WHERE ZTEXT IS NOT NULL;")
+    cursor.execute("SELECT COUNT(*) FROM ZWAMESSAGE;")
     total_messages = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM ZWAMESSAGE WHERE ZTEXT IS NOT NULL AND ZTEXT != '';")
+    text_messages = cursor.fetchone()[0]
+    media_messages = total_messages - text_messages
 
     cursor.execute("""
         SELECT 
@@ -76,25 +81,62 @@ def show_stats(conn):
             COUNT(m.Z_PK) AS msg_count
         FROM ZWAMESSAGE m
         LEFT JOIN ZWACHATSESSION s ON m.ZCHATSESSION = s.Z_PK
-        WHERE m.ZTEXT IS NOT NULL AND m.ZTEXT != ''
         GROUP BY m.ZCHATSESSION
         ORDER BY msg_count DESC
         LIMIT 20;
     """)
     top_chats = cursor.fetchall()
 
-    print("\n" + "=" * 50)
-    print(f"  Total Text Messages: {total_messages:,}")
-    print("=" * 50)
-    print(f"{'Chat Name':<35} | {'Messages':>10}")
-    print("-" * 50)
+    print("\n" + "=" * 55)
+    print(f"  Total Messages (All):  {total_messages:,}")
+    print(f"  - Text Messages:       {text_messages:,}")
+    print(f"  - Media / Voice Notes: {media_messages:,}")
+    print("=" * 55)
+    print(f"{'Chat Name':<38} | {'Messages':>12}")
+    print("-" * 55)
     for name, count in top_chats:
-        disp_name = (name[:32] + "...") if len(name) > 35 else name
-        print(f"{disp_name:<35} | {count:>10,}")
-    print("=" * 50 + "\n")
+        disp_name = (name[:35] + "...") if len(name) > 38 else name
+        print(f"{disp_name:<38} | {count:>12,}")
+    print("=" * 55 + "\n")
 
 
-def extract_messages(conn, output_path, export_format="csv", chat_filter=None):
+def build_message_text_expression(msg_cols, tables):
+    """
+    Builds a SQL expression that classifies message types:
+    text, voice notes, photos, videos, documents, or stickers.
+    """
+    has_type = "ZMESSAGETYPE" in msg_cols
+
+    if has_type:
+        return """
+        CASE 
+            WHEN m.ZTEXT IS NOT NULL AND m.ZTEXT != '' AND m.ZMESSAGETYPE = 0 THEN m.ZTEXT
+            WHEN m.ZTEXT IS NOT NULL AND m.ZTEXT != '' THEN 
+                CASE m.ZMESSAGETYPE
+                    WHEN 1 THEN '[Photo] ' || m.ZTEXT
+                    WHEN 2 THEN '[Voice Note] ' || m.ZTEXT
+                    WHEN 3 THEN '[Video] ' || m.ZTEXT
+                    WHEN 8 THEN '[Document] ' || m.ZTEXT
+                    ELSE '[' || m.ZTEXT || ']'
+                END
+            ELSE 
+                CASE m.ZMESSAGETYPE
+                    WHEN 1 THEN '[Photo]'
+                    WHEN 2 THEN '[Voice Note / Audio]'
+                    WHEN 3 THEN '[Video]'
+                    WHEN 4 THEN '[Contact Card]'
+                    WHEN 5 THEN '[Location]'
+                    WHEN 8 THEN '[Document]'
+                    WHEN 15 THEN '[Sticker]'
+                    ELSE '[Media / Voice Note / Attachment]'
+                END
+        END
+        """
+    else:
+        return "COALESCE(NULLIF(m.ZTEXT, ''), '[Media / Voice Note / Attachment]')"
+
+
+def extract_messages(conn, output_path, export_format="csv", chat_filter=None, text_only=False):
     cursor = conn.cursor()
 
     # Discover tables & columns
@@ -113,6 +155,13 @@ def extract_messages(conn, output_path, export_format="csv", chat_filter=None):
     has_from_jid = "ZFROMJID" in msg_cols
 
     date_expr = "datetime(m.ZMESSAGEDATE + 978307200, 'unixepoch', 'localtime') AS MessageDate"
+    text_expr = build_message_text_expression(msg_cols, tables)
+
+    where_clauses = []
+    params = []
+
+    if text_only:
+        where_clauses.append("m.ZTEXT IS NOT NULL AND m.ZTEXT != ''")
 
     if has_chat_session:
         cursor.execute("PRAGMA table_info(ZWACHATSESSION);")
@@ -122,14 +171,11 @@ def extract_messages(conn, output_path, export_format="csv", chat_filter=None):
         from_me_expr = "m.ZISFROMME" if has_is_from_me else "0"
         from_jid_expr = "m.ZFROMJID" if has_from_jid else "''"
 
-        where_clauses = ["m.ZTEXT IS NOT NULL", "m.ZTEXT != ''"]
-        params = []
-
         if chat_filter:
             where_clauses.append(f"({partner_col} LIKE ? OR {jid_col} LIKE ?)")
             params.extend([f"%{chat_filter}%", f"%{chat_filter}%"])
 
-        where_sql = " AND ".join(where_clauses)
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
         query = f"""
         SELECT 
@@ -141,17 +187,15 @@ def extract_messages(conn, output_path, export_format="csv", chat_filter=None):
                 WHEN {from_jid_expr} IS NOT NULL AND {from_jid_expr} != '' THEN {from_jid_expr}
                 ELSE COALESCE({partner_col}, 'Them')
             END AS Sender,
-            m.ZTEXT AS MessageText
+            {text_expr} AS MessageText
         FROM ZWAMESSAGE m
         LEFT JOIN ZWACHATSESSION s ON m.ZCHATSESSION = s.Z_PK
-        WHERE {where_sql}
+        {where_sql}
         ORDER BY m.ZMESSAGEDATE ASC;
         """
     else:
         from_jid_expr = "m.ZFROMJID" if has_from_jid else "'Unknown'"
-        where_clauses = ["m.ZTEXT IS NOT NULL", "m.ZTEXT != ''"]
-        params = []
-        where_sql = " AND ".join(where_clauses)
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
         query = f"""
         SELECT 
@@ -159,9 +203,9 @@ def extract_messages(conn, output_path, export_format="csv", chat_filter=None):
             'Chat' AS ChatName,
             '' AS ChatJID,
             COALESCE({from_jid_expr}, 'Unknown') AS Sender,
-            m.ZTEXT AS MessageText
+            {text_expr} AS MessageText
         FROM ZWAMESSAGE m
-        WHERE {where_sql}
+        {where_sql}
         ORDER BY m.ZMESSAGEDATE ASC;
         """
 
@@ -185,12 +229,12 @@ def extract_messages(conn, output_path, export_format="csv", chat_filter=None):
             writer.writerow(headers)
             writer.writerows(rows)
 
-    print(f"[+] Successfully exported {len(rows):,} messages to: {os.path.abspath(output_path)}")
+    print(f"[+] Successfully exported {len(rows):,} total messages to: {os.path.abspath(output_path)}")
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Extract and export messages from an unencrypted WhatsApp iOS ChatStorage.sqlite backup."
+        description="Extract and export complete WhatsApp chat history (texts, voice notes, media logs) from local iPhone backups."
     )
     parser.add_argument(
         "database",
@@ -218,10 +262,15 @@ def parse_args():
         help="Filter messages by contact name or phone number/JID.",
     )
     parser.add_argument(
+        "--text-only",
+        action="store_true",
+        help="Only export typed text messages, skipping standalone voice notes and media placeholders.",
+    )
+    parser.add_argument(
         "-s",
         "--stats",
         action="store_true",
-        help="Display top chat statistics and message counts without exporting.",
+        help="Display message stats (total, texts, media) and top chats without exporting.",
     )
     return parser.parse_args()
 
@@ -247,7 +296,13 @@ def main():
             show_stats(conn)
         else:
             out_file = args.output or f"whatsapp_messages.{args.format}"
-            extract_messages(conn, out_file, export_format=args.format, chat_filter=args.chat_filter)
+            extract_messages(
+                conn,
+                out_file,
+                export_format=args.format,
+                chat_filter=args.chat_filter,
+                text_only=args.text_only,
+            )
     finally:
         conn.close()
 

@@ -70,22 +70,25 @@ Once your iPhone's summary window appears:
 
 ## Step-by-Step Guide: Extracting Data
 
-### Extracting Text Messages
-The extractor will auto-detect the newest backup on your Mac and pull messages with sender labels, timestamps, and contact names:
+### Extracting Complete Message History (Texts + Media Logs)
+The extractor pulls the complete conversation timeline—including typed texts, voice note records, photos, videos, and stickers:
 
 ```bash
 cd /Users/katlego/work/Whatsapp
 
-# 1. View chat statistics and message counts in terminal
+# 1. View breakdown: Total messages, texts, media/voice notes, and top chats
 python3 extract_whatsapp.py --stats
 
-# 2. Export all messages to whatsapp_messages.csv
+# 2. Export complete history to whatsapp_messages.csv (includes [Voice Note], [Photo], etc.)
 python3 extract_whatsapp.py
 
-# 3. Export to JSON format
+# 3. Export ONLY typed text messages (skipping media placeholders)
+python3 extract_whatsapp.py --text-only
+
+# 4. Export to JSON format
 python3 extract_whatsapp.py --format json -o chats.json
 
-# 4. Filter messages by a specific person or phone number
+# 5. Filter messages by a specific person or phone number
 python3 extract_whatsapp.py --filter "Sarah" -o sarah_messages.csv
 ```
 
