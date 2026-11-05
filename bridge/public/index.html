@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Live Bridge & Dashboard</title>
+  <style>
+    :root {
+      --bg-dark: #111b21;
+      --panel-bg: #202c33;
+      --bubble-in: #202c33;
+      --bubble-out: #005c4b;
+      --text-main: #e9edef;
+      --text-dim: #8696a0;
+      --accent: #00a884;
+      --border-color: #2a3942;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .badge-connected { background: rgba(0, 168, 132, 0.15); color: #00a884; border: 1px solid #00a884; }
+    .badge-waiting { background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid #ffaa00; }
+    .badge-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+    .main-container {
+      flex: 1;
+      display: flex;
+      height: calc(100vh - 60px);
+      overflow: hidden;
+    }
+    .sidebar {
+      width: 380px;
+      border-right: 1px solid var(--border-color);
+      background: var(--bg-dark);
+      display: flex;
+      flex-direction: column;
+    }
+    .search-bar {
+      padding: 10px 14px;
+      background: var(--bg-dark);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .search-bar input {
+      width: 100%;
+      padding: 8px 14px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-main);
+      font-size: 0.9rem;
+      outline: none;
+    }
+    .chat-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .chat-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.15s ease;
+    }
+    .chat-item:hover, .chat-item.active {
+      background: var(--panel-bg);
+    }
+    .chat-item-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .chat-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chat-preview {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chat-time {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-left: 10px;
+      white-space: nowrap;
+    }
+
+    .chat-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #0b141a;
+      position: relative;
+    }
+    .chat-header {
+      background: var(--panel-bg);
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .chat-header-title {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+    .chat-header-sub {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+    .messages-container {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .bubble {
+      max-width: 65%;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      position: relative;
+      word-wrap: break-word;
+    }
+    .bubble.in {
+      align-self: flex-start;
+      background: var(--bubble-in);
+      border-top-left-radius: 2px;
+    }
+    .bubble.out {
+      align-self: flex-end;
+      background: var(--bubble-out);
+      border-top-right-radius: 2px;
+    }
+    .sender-name {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 3px;
+    }
+    .meta-time {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      text-align: right;
+      margin-top: 4px;
+    }
+    .bubble.out .meta-time {
+      color: rgba(255, 255, 255, 0.6);
+    }
+    audio {
+      margin-top: 4px;
+      height: 36px;
+      outline: none;
+      filter: invert(0.9) hue-rotate(180deg);
+    }
+
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      gap: 12px;
+    }
+
+    /* QR Overlay */
+    .qr-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(4px);
+    }
+    .qr-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      padding: 30px;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 440px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .qr-card h2 {
+      margin-bottom: 10px;
+      font-size: 1.3rem;
+    }
+    .qr-card p {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .qr-frame {
+      background: white;
+      padding: 16px;
+      border-radius: 12px;
+      display: inline-block;
+      margin-bottom: 16px;
+    }
+    .qr-frame img {
+      width: 250px;
+      height: 250px;
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      .main-container { flex-direction: column; }
+      .sidebar { width: 100%; height: 50%; }
+      .chat-panel { height: 50%; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span>💬 WhatsApp Live Bridge</span>
+    </div>
+    <div id="statusBadge" class="badge badge-waiting">
+      <span class="badge-dot"></span>
+      <span id="statusText">Connecting...</span>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search chats or phone numbers..." oninput="filterChats()">
+      </div>
+      <div class="chat-list" id="chatList"></div>
+    </div>
+
+    <!-- Active Chat Panel -->
+    <div class="chat-panel" id="chatPanel">
+      <div class="empty-state" id="emptyState">
+        <h3>Select a conversation to start reading</h3>
+        <p>New messages and voice notes arrive in real-time.</p>
+      </div>
+      <div id="activeChatView" style="display: none; height: 100%; flex-direction: column;">
+        <div class="chat-header">
+          <div>
+            <div class="chat-header-title" id="activeChatTitle">Chat</div>
+            <div class="chat-header-sub" id="activeChatJid"></div>
+          </div>
+        </div>
+        <div class="messages-container" id="messagesContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR Code Modal -->
+  <div class="qr-modal" id="qrModal">
+    <div class="qr-card">
+      <h2>Link Your WhatsApp</h2>
+      <p>1. Open WhatsApp on your iPhone<br>
+         2. Go to <b>Settings → Linked Devices</b><br>
+         3. Tap <b>Link a Device</b> and point camera here:</p>
+      <div class="qr-frame">
+        <img id="qrImage" src="" alt="Scan QR Code">
+      </div>
+      <p style="font-size: 0.8rem; color: #8696a0;">This connects your Mac directly to WhatsApp's servers without storing backups.</p>
+    </div>
+  </div>
+
+  <script>
+    let allChats = [];
+    let activeJid = null;
+
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        updateStatusUI(data.status, data.qr);
+      } catch (e) {
+        console.error('Failed to fetch status:', e);
+      }
+    }
+
+    function updateStatusUI(status, qrDataUrl) {
+      const badge = document.getElementById('statusBadge');
+      const text = document.getElementById('statusText');
+      const qrModal = document.getElementById('qrModal');
+      const qrImg = document.getElementById('qrImage');
+
+      if (status === 'connected') {
+        badge.className = 'badge badge-connected';
+        text.innerText = 'Connected (Live 24/7)';
+        qrModal.style.display = 'none';
+      } else if (status === 'qr_ready') {
+        badge.className = 'badge badge-waiting';
+        text.innerText = 'Scan QR Code';
+        if (qrDataUrl) {
+          qrImg.src = qrDataUrl;
+          qrModal.style.display = 'flex';
+        }
+      } else {
+        badge.className = 'badge badge-waiting';
+        text.innerText = status || 'Connecting...';
+      }
+    }
+
+    async function loadChats() {
+      try {
+        const res = await fetch('/api/chats');
+        allChats = await res.json();
+        renderChats(allChats);
+      } catch (e) {
+        console.error('Failed to load chats:', e);
+      }
+    }
+
+    function formatTime(timestamp) {
+      if (!timestamp) return '';
+      const date = new Date(timestamp * 1000);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function renderChats(chats) {
+      const list = document.getElementById('chatList');
+      list.innerHTML = '';
+      for (const chat of chats) {
+        const item = document.createElement('div');
+        item.className = 'chat-item' + (chat.jid === activeJid ? ' active' : '');
+        item.onclick = () => selectChat(chat.jid, chat.name || chat.jid);
+
+        const title = chat.name || chat.jid.split('@')[0];
+        item.innerHTML = `
+          <div class="chat-item-info">
+            <div class="chat-name">${escapeHtml(title)}</div>
+            <div class="chat-preview">${escapeHtml(chat.last_message || '')}</div>
+          </div>
+          <div class="chat-time">${formatTime(chat.last_timestamp)}</div>
+        `;
+        list.appendChild(item);
+      }
+    }
+
+    function filterChats() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = allChats.filter(c => 
+        (c.name && c.name.toLowerCase().includes(q)) || 
+        c.jid.toLowerCase().includes(q) ||
+        (c.last_message && c.last_message.toLowerCase().includes(q))
+      );
+      renderChats(filtered);
+    }
+
+    async function selectChat(jid, title) {
+      activeJid = jid;
+      renderChats(allChats);
+
+      document.getElementById('emptyState').style.display = 'none';
+      const activeView = document.getElementById('activeChatView');
+      activeView.style.display = 'flex';
+
+      document.getElementById('activeChatTitle').innerText = title;
+      document.getElementById('activeChatJid').innerText = jid;
+
+      await loadMessages(jid);
+    }
+
+    async function loadMessages(jid) {
+      try {
+        const res = await fetch('/api/messages/' + encodeURIComponent(jid));
+        const messages = await res.json();
+        const container = document.getElementById('messagesContainer');
+        container.innerHTML = '';
+
+        for (const m of messages) {
+          const bubble = document.createElement('div');
+          bubble.className = 'bubble ' + (m.from_me ? 'out' : 'in');
+
+          let mediaHtml = '';
+          if (m.media_path && m.message_type === 'voice_note') {
+            mediaHtml = `<audio controls src="${m.media_path}" preload="none"></audio>`;
+          }
+
+          const senderHtml = (!m.from_me && m.sender_name) 
+            ? `<div class="sender-name">${escapeHtml(m.sender_name)}</div>` 
+            : '';
+
+          bubble.innerHTML = `
+            ${senderHtml}
+            <div>${escapeHtml(m.text)}</div>
+            ${mediaHtml}
+            <div class="meta-time">${formatTime(m.timestamp)}</div>
+          `;
+          container.appendChild(bubble);
+        }
+        container.scrollTop = container.scrollHeight;
+      } catch (e) {
+        console.error('Failed to load messages:', e);
+      }
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/[&<>'"]/g, 
+        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+    }
+
+    // Connect to Server-Sent Events (SSE) for Real-Time Streaming
+    function setupSSE() {
+      const evtSource = new EventSource('/api/events');
+
+      evtSource.addEventListener('status', (e) => {
+        const data = JSON.parse(e.data);
+        updateStatusUI(data.status, data.qr);
+      });
+
+      evtSource.addEventListener('new_message', (e) => {
+        const data = JSON.parse(e.data);
+        loadChats();
+        if (activeJid && data.chatJid === activeJid) {
+          loadMessages(activeJid);
+        }
+      });
+
+      evtSource.onerror = () => {
+        setTimeout(setupSSE, 5000);
+      };
+    }
+
+    // Initial boot
+    loadStatus();
+    loadChats();
+    setupSSE();
+  </script>
+</body>
+</html>

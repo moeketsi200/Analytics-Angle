@@ -35,3 +35,10 @@ VoiceNotes/
 *.m4a
 *.wav
 *.mp3
+
+# Bridge secrets, sessions, media, and dependencies
+bridge/node_modules/
+bridge/auth_info/
+bridge/media/
+bridge/*.db
+

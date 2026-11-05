@@ -1,13 +1,49 @@
-# WhatsApp iOS Local Backup Toolkit
+# WhatsApp iOS & Web Toolkit
 
-A lightweight, zero-dependency Python toolkit to extract and export WhatsApp text messages and voice notes directly from unencrypted local iPhone backups on macOS.
+A comprehensive toolkit for WhatsApp:
+1. **Headless Web Bridge & Live Dashboard** (`bridge/`): Real-time live synchronization (under 50 MB disk space, zero USB cables needed), built-in web dashboard, and live voice note playback.
+2. **Local Backup Extractor** (`extract_whatsapp.py` & `extract_audio.py`): Offline extractor for unencrypted Finder backups.
 
 ---
 
-## Tools in This Repository
+## 🚀 Headless Web Bridge (Recommended: Live & Zero Disk Space)
 
-1. **`extract_whatsapp.py`**: Extracts text messages, chat metadata, senders, and timestamps from `ChatStorage.sqlite` into CSV or JSON.
-2. **`extract_audio.py`**: Locates and extracts all WhatsApp voice notes (`.opus`, `.m4a`) from the backup using Apple's `Manifest.db` master index, organizing them by chat/contact name and timestamp.
+This mode connects directly to WhatsApp Web's Multi-Device protocol. It bypasses iPhone backup size limits, uses less than **50 MB** of disk space, updates **in real-time** (every second), and lets you view your messages from any browser or phone.
+
+### How to Run:
+
+1. **Start the bridge server**:
+   ```bash
+   cd /Users/katlego/work/Whatsapp/bridge
+   npm start
+   ```
+
+2. **Link your device (one-time)**:
+   - A QR code will display directly in your Terminal.
+   - You can also open **`http://localhost:3000`** in any web browser to see the QR code on a screen.
+   - On your iPhone: Open **WhatsApp → Settings → Linked Devices → Link a Device**.
+   - Scan the QR code.
+
+3. **That's it!**:
+   - The connection is now persistent (you will **not** need to scan again on restarts).
+   - All incoming/outgoing texts and voice notes stream live into the dashboard.
+   - Built-in HTML5 player lets you listen to voice notes directly in your browser.
+
+### Accessing the Dashboard from Anywhere:
+
+- **From any device on your Wi-Fi**: Open `http://<YOUR_MAC_IP>:3000` on your phone or laptop.
+- **From anywhere outside your home (Remote)**:
+  Run a free secure tunnel (like Cloudflare Tunnel or Tailscale):
+  ```bash
+  # Example using free Cloudflare quick tunnel:
+  brew install cloudflare/cloudflare/cloudflared
+  cloudflared tunnel --url http://localhost:3000
+  ```
+  This generates a secure `https://random-name.trycloudflare.com` URL you can open from anywhere in the world.
+
+---
+
+## 📦 Offline Backup Extractor (Method 2)
 
 ---
 

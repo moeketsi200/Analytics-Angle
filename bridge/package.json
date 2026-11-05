@@ -1,0 +1,16 @@
+{
+  "name": "whatsapp-live-bridge",
+  "version": "1.0.0",
+  "description": "Headless WhatsApp Web Bridge & Real-Time Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "express": "^4.19.2",
+    "pino": "^9.0.0",
+    "qrcode": "^1.5.3",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
