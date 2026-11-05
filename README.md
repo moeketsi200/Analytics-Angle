@@ -1,19 +1,17 @@
-# Independent Chat Archive Toolkit
+# Local Message Archive Toolkit
 
 An independent personal utility with two separate tools:
 
-1. **Linked-device bridge** (`bridge/`): Uses the unofficial Baileys library to capture new messages from a linked WhatsApp account and keep a small local archive.
+1. **Linked-device collector** (`bridge/`): Captures new messages from a linked device and keeps a small local archive.
 2. **iPhone backup extractor** (`extract_whatsapp.py` & `extract_audio.py`): Reads chat data from an unencrypted local iPhone backup.
-
-> This project is not made by, affiliated with, or endorsed by WhatsApp or Meta. WhatsApp is a trademark of its respective owner. The bridge is an independent, unofficial integration and may stop working if the linked-device protocol changes.
 
 ---
 
-## Linked-device bridge
+## Linked-device collector
 
-The bridge links to WhatsApp as a secondary device. It does not need an iPhone cable or Finder backup, but it is not zero-disk: the installed dependencies use about 54 MB, and the local database, linked-device credentials, and optional voice notes use additional space. It stores the latest 5,000 message notifications; it does not import earlier chat history. Voice-note downloads are limited to 8 MiB each and 32 MiB total.
+The collector links as a secondary device. It does not need an iPhone cable or Finder backup, but it is not zero-disk: the installed dependencies use about 54 MB, and the local database, linked-device credentials, and optional voice notes use additional space. It stores the latest 5,000 message notifications; it does not import earlier chat history. Voice-note downloads are limited to 8 MiB each and 32 MiB total.
 
-New message delivery, older history, and access to locked chats are not guaranteed.
+**Compatibility:** The current connector uses Baileys to access WhatsApp linked devices. It is an unofficial integration, is not affiliated with or endorsed by WhatsApp or Meta, and may stop working if the linked-device protocol changes. New message delivery, older history, and access to locked chats are not guaranteed.
 
 ### Start the bridge
 
