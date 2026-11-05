@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# macOS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Sensitive database backups and personal exports (CRITICAL)
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db
+7c*
+ChatStorage*
+
+# Exported data files
+*.csv
+*.tsv
+whatsapp_messages.*
+whatsapp_logs.*
