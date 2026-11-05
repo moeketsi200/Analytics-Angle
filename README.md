@@ -11,8 +11,6 @@ An independent personal utility with two separate tools:
 
 The collector links as a secondary device. It does not need an iPhone cable or Finder backup, but it is not zero-disk: the installed dependencies use about 54 MB, and the local database, linked-device credentials, and optional voice notes use additional space. It stores the latest 5,000 message notifications; it does not import earlier chat history. Voice-note downloads are limited to 8 MiB each and 32 MiB total.
 
-**Compatibility:** The current connector uses Baileys to access WhatsApp linked devices. It is an unofficial integration, is not affiliated with or endorsed by WhatsApp or Meta, and may stop working if the linked-device protocol changes. New message delivery, older history, and access to locked chats are not guaranteed.
-
 ### Start the bridge
 
 Use Node.js 22.13 or later:
@@ -22,8 +20,6 @@ cd bridge
 npm ci
 npm start
 ```
-
-Scan the QR code in Terminal from **WhatsApp → Settings → Linked devices → Link a device**. Open <http://127.0.0.1:3000> on the Mac. New live message notifications appear in the dashboard; voice notes up to the stated limits can be played there. Other media is shown as a message placeholder.
 
 Data is saved under `bridge/.data/`; linked-device credentials are saved under `bridge/auth_info/`. Both are ignored by Git. The dashboard listens only on the Mac by default. The Mac must be awake and connected for the bridge to receive messages.
 
@@ -48,14 +44,7 @@ Keep the bridge bound to `127.0.0.1` when using a local tunnel or proxy; enter t
 
 ## How It Works
 
-WhatsApp encrypts messages end-to-end over the network, but unencrypted local backups created via Finder save the decrypted application data on your Mac:
 
-- **Text Database:** `ChatStorage.sqlite` (Hashed as `7c7fba66680ef796b916b067077cc246adacf01d` inside folder `7c/`).
-- **Master Index:** `Manifest.db` (Maps the hashed filenames to their real filenames, domains, and relative paths).
-- **Voice Notes:** Stored as hashed files corresponding to `.opus` or `.m4a` files.
-- **Location:** `~/Library/Application Support/MobileSync/Backup/<BACKUP_ID>/`
-
----
 
 ## Prerequisites
 
@@ -127,13 +116,6 @@ python3 extract_whatsapp.py --format json -o chats.json
 python3 extract_whatsapp.py --filter "Sarah" -o sarah_messages.csv
 ```
 
-### Extracting Voice Notes (Audio)
-```bash
-# Extract all voice notes into the VoiceNotes/ folder
-python3 extract_audio.py
-```
-If `ChatStorage.sqlite` is present, voice notes are automatically sorted into subfolders by contact name with timestamps (e.g. `VoiceNotes/Sarah/2024-03-15_14-30-22_Me_audio.opus`).
-
 ---
 
 ## How to Listen to `.opus` Files on macOS
@@ -169,9 +151,3 @@ QuickTime does not support `.opus` natively out of the box. You have three simpl
   - If an encrypted backup was set up in the past, Apple requires you to enter that password once to switch back to unencrypted backups.
 
 ---
-
-## Privacy & Security
-
-- **Backup extractor:** Processing is local and offline once an iPhone backup is on your computer.
-- **Live bridge:** Connects to WhatsApp as a linked device. Recent messages, downloaded voice notes, and linked-device credentials are retained on the Mac. The dashboard is local-only unless you configure authenticated remote access.
-- **Git Safety:** `.gitignore` blocks databases (`*.sqlite`, `*.db`, `Manifest.db`), chat logs (`*.csv`, `*.json`), and audio files (`*.opus`, `*.m4a`, `VoiceNotes/`) from being tracked or committed to version control.
