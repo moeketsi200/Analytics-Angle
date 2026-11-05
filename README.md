@@ -1,108 +1,98 @@
-# WhatsApp iOS Local Backup Extractor
+# WhatsApp iOS Local Backup Toolkit
 
-A lightweight, zero-dependency Python tool to parse and export WhatsApp chat history from unencrypted local iPhone backups on macOS.
-
----
-
-## Why This Works
-
-WhatsApp uses end-to-end encryption over the network, but when you perform a local, unencrypted backup of your iPhone to a Mac via Finder, iOS saves the decrypted application database onto your Mac's filesystem:
-
-- **Target Database:** `ChatStorage.sqlite` (Core Data SQLite database)
-- **Backup File Hash:** `7c7fba66680ef796b916b067077cc246adacf01d` (the SHA-1 hash of `AppDomainGroup-group.net.whatsapp.WhatsApp.shared-ChatStorage.sqlite`)
-- **Location:** `~/Library/Application Support/MobileSync/Backup/<BACKUP_ID>/7c/`
-- **Core Data Timestamp Offset:** Adds `978307200` seconds to convert Apple's epoch (Jan 1, 2001) to Unix epoch (Jan 1, 1970).
+A lightweight, zero-dependency Python toolkit to extract and export WhatsApp text messages and voice notes directly from unencrypted local iPhone backups on macOS.
 
 ---
 
-## Requirements
+## Tools in This Repository
 
-- **macOS** with Python 3.6+ (uses standard library modules: `sqlite3`, `csv`, `json`, `argparse`).
+1. **`extract_whatsapp.py`**: Extracts text messages, chat metadata, senders, and timestamps from `ChatStorage.sqlite` into CSV or JSON.
+2. **`extract_audio.py`**: Locates and extracts all WhatsApp voice notes (`.opus`, `.m4a`) from the backup using Apple's `Manifest.db` master index, organizing them by chat/contact name and timestamp.
+
+---
+
+## How It Works
+
+WhatsApp encrypts messages end-to-end over the network, but unencrypted local backups created via Finder save the decrypted application data on your Mac:
+
+- **Text Database:** `ChatStorage.sqlite` (Hashed as `7c7fba66680ef796b916b067077cc246adacf01d` inside folder `7c/`).
+- **Master Index:** `Manifest.db` (Maps the hashed filenames to their real filenames, domains, and relative paths).
+- **Voice Notes:** Stored as hashed files corresponding to `.opus` or `.m4a` files.
+- **Location:** `~/Library/Application Support/MobileSync/Backup/<BACKUP_ID>/`
+
+---
+
+## Prerequisites
+
+- **macOS** with Python 3.6+
 - **An unencrypted local iPhone backup** created using Finder.
 
 > [!IMPORTANT]
-> **Encrypt Local Backup** in Finder must be **UNCHECKED**. If your backup is encrypted, the database is locked behind iOS backup keybags and cannot be read without decryption keys.
+> **Encrypt Local Backup** in Finder must be **UNCHECKED**. If your backup is encrypted, both `ChatStorage.sqlite` and media files are encrypted with iOS keybags and cannot be read.
 
 ---
 
 ## Step 1: Create an Unencrypted Backup
 
-1. Connect your iPhone to your Mac via USB cable.
-2. Open **Finder** and select your iPhone under **Locations** in the sidebar.
-3. In the **General** tab under **Backups**:
+1. Connect your iPhone to your Mac via USB.
+2. Open **Finder** and click on your iPhone in the sidebar.
+3. Under **Backups**:
    - Select **"Back up all of the data on your iPhone to this Mac"**.
-   - Make sure **"Encrypt local backup"** is **unchecked**.
-4. Click **Back Up Now** and wait for completion.
+   - Ensure **"Encrypt local backup"** is **unchecked**.
+4. Click **Back Up Now** and wait for it to complete.
 
 ---
 
-## Step 2: Locate `ChatStorage.sqlite`
-
-### Option A: Automatic Detection
-The script will automatically attempt to find the newest backup in:
-```bash
-~/Library/Application Support/MobileSync/Backup/
-```
-*(Note: If macOS displays `Permission denied`, grant Terminal **Full Disk Access** in **System Settings > Privacy & Security > Full Disk Access**, or use Option B).*
-
-### Option B: Manual Copy (Recommended)
-1. Open Finder, press `Cmd + Shift + G`, and paste:
-   ```
-   ~/Library/Application Support/MobileSync/Backup/
-   ```
-2. Open the folder with the latest date/time stamp.
-3. Open folder `7c`.
-4. Copy the file named `7c7fba66680ef796b916b067077cc246adacf01d` to this project directory and rename it to:
-   ```
-   ChatStorage.sqlite
-   ```
-
----
-
-## Step 3: Usage
+## Step 2: Extracting Text Messages
 
 ### Basic Export (CSV)
-Exports all messages to `whatsapp_messages.csv`:
 ```bash
 python3 extract_whatsapp.py
 ```
 
 ### View Chat Statistics
-View top contacts and message counts without writing a file:
 ```bash
 python3 extract_whatsapp.py --stats
 ```
 
-### Export to JSON
+### Export to JSON or Filter by Contact
 ```bash
-python3 extract_whatsapp.py --format json -o my_chats.json
-```
-
-### Filter by Specific Contact or Phone Number
-```bash
-python3 extract_whatsapp.py --filter "John" -o john_messages.csv
-```
-
-### Specify a Custom Database Path
-```bash
-python3 extract_whatsapp.py /path/to/ChatStorage.sqlite
+python3 extract_whatsapp.py --format json -o chats.json
+python3 extract_whatsapp.py --filter "Sarah" -o sarah_chat.csv
 ```
 
 ---
 
-## Output Fields
+## Step 3: Extracting Voice Notes (Audio)
 
-| Field | Description |
-|---|---|
-| `Timestamp` | Localized message timestamp (`YYYY-MM-DD HH:MM:SS`) |
-| `Chat Name` | Name of the contact or group chat |
-| `Chat ID / JID` | WhatsApp JID (phone number or group ID) |
-| `Sender` | Identifies sender (`Me`, contact name, or phone number) |
-| `Message` | Text content of the message |
+WhatsApp voice notes are stored as `.opus` audio files. Because Apple hashes all filenames in the backup, `extract_audio.py` queries `Manifest.db` to locate and extract them.
+
+### Basic Audio Extraction
+```bash
+python3 extract_audio.py
+```
+This extracts all voice notes into the `VoiceNotes/` folder. If `ChatStorage.sqlite` is present, it will automatically organize voice notes into subfolders by contact name with dates and sender tags (e.g. `VoiceNotes/Sarah/2024-03-15_14-30-22_Me_audio.opus`).
+
+### How to Listen to `.opus` Files on Mac
+
+QuickTime does not support `.opus` natively out of the box. You have three simple options:
+
+1. **Web Browser (Zero install):** Drag and drop any `.opus` file directly into **Google Chrome** or **Firefox**—they play instantly.
+2. **VLC Media Player:** Open the files with [VLC for Mac](https://www.videolan.org/vlc/).
+3. **Auto-convert to Apple-native `.m4a`:**
+   Install `ffmpeg`:
+   ```bash
+   brew install ffmpeg
+   ```
+   Then run the extractor with the `--convert` flag:
+   ```bash
+   python3 extract_audio.py --convert
+   ```
+   This generates `.m4a` files alongside the `.opus` files so you can preview them simply by tapping **Spacebar** (Quick Look) or opening them in QuickTime.
 
 ---
 
 ## Privacy & Security
 
-- **Never commit your database or exports.** `.gitignore` is preconfigured to prevent `ChatStorage.sqlite`, `*.db`, `*.csv`, and `*.json` from ever being staged or pushed.
-- All operations run 100% offline on your local computer. No data is sent over the network.
+- **Local Only:** All processing is done offline on your computer.
+- **Git Safety:** `.gitignore` blocks databases (`*.sqlite`, `*.db`, `Manifest.db`), chat logs (`*.csv`, `*.json`), and audio files (`*.opus`, `*.m4a`, `VoiceNotes/`) from being tracked or committed to version control.

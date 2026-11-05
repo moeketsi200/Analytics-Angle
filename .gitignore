@@ -19,11 +19,19 @@ env/
 *.sqlite-wal
 *.sqlite-shm
 *.db
+Manifest.db
 7c*
 ChatStorage*
 
-# Exported data files
+# Exported chat data files
 *.csv
 *.tsv
 whatsapp_messages.*
 whatsapp_logs.*
+
+# Voice notes & audio media folders/files
+VoiceNotes/
+*.opus
+*.m4a
+*.wav
+*.mp3
