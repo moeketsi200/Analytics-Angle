@@ -1,0 +1,24 @@
+# WhatsApp Extractor Configuration Template
+# You can customize your default preferences here.
+
+extraction:
+  # Output format: "csv" or "json"
+  format: "csv"
+  # Set to true if you only want typed messages and want to omit media placeholders
+  text_only: false
+  # Filter by contact name or phone number/JID (leave blank for all chats)
+  filter: ""
+
+audio:
+  # Folder where voice notes will be extracted
+  output_dir: "VoiceNotes"
+  # Automatically convert .opus to .m4a using ffmpeg for native Mac QuickTime / Spacebar preview
+  convert_to_m4a: false
+  # Organize into subfolders named after each contact
+  organize_by_contact: true
+
+paths:
+  # Optional explicit paths (leave blank to auto-detect newest backup)
+  custom_backup_dir: ""
+  custom_chatstorage_path: ""
+  custom_manifest_path: ""
