@@ -1,24 +1,26 @@
-# WhatsApp iOS Backup Toolkit and Live Bridge
+# Independent Chat Archive Toolkit
 
-This repository has two separate tools:
+An independent personal utility with two separate tools:
 
-1. **Headless Web Bridge & Live Dashboard** (`bridge/`): Captures new messages from a linked WhatsApp device and keeps a small local archive.
-2. **Local Backup Extractor** (`extract_whatsapp.py` & `extract_audio.py`): Offline extractor for unencrypted Finder backups.
+1. **Linked-device bridge** (`bridge/`): Uses the unofficial Baileys library to capture new messages from a linked WhatsApp account and keep a small local archive.
+2. **iPhone backup extractor** (`extract_whatsapp.py` & `extract_audio.py`): Reads chat data from an unencrypted local iPhone backup.
+
+> This project is not made by, affiliated with, or endorsed by WhatsApp or Meta. WhatsApp is a trademark of its respective owner. The bridge is an independent, unofficial integration and may stop working if the linked-device protocol changes.
 
 ---
 
-## Headless Web Bridge
+## Linked-device bridge
 
-This experimental mode links as a WhatsApp Web device. It does not need an iPhone cable or Finder backup, but it is not zero-disk: the installed dependencies use about 54 MB, and the local database, linked-device credentials, and optional voice notes use additional space. The bridge stores the latest 5,000 message notifications; it does not import earlier chat history. Voice-note downloads are limited to 8 MiB each and 32 MiB total.
+The bridge links to WhatsApp as a secondary device. It does not need an iPhone cable or Finder backup, but it is not zero-disk: the installed dependencies use about 54 MB, and the local database, linked-device credentials, and optional voice notes use additional space. It stores the latest 5,000 message notifications; it does not import earlier chat history. Voice-note downloads are limited to 8 MiB each and 32 MiB total.
 
-Baileys is an unofficial WhatsApp Web client, not an official WhatsApp integration. It may disconnect or stop working when WhatsApp changes its protocol. New message delivery, older history, and access to locked chats are not guaranteed.
+New message delivery, older history, and access to locked chats are not guaranteed.
 
 ### Start the bridge
 
 Use Node.js 22.13 or later:
 
 ```bash
-cd /Users/katlego/work/Whatsapp/bridge
+cd bridge
 npm ci
 npm start
 ```
@@ -32,7 +34,7 @@ Data is saved under `bridge/.data/`; linked-device credentials are saved under `
 Remote access is disabled by default. For access through a trusted encrypted VPN or HTTPS proxy, set a token before starting the bridge:
 
 ```bash
-cd /Users/katlego/work/Whatsapp/bridge
+cd bridge
 export BRIDGE_TOKEN="$(openssl rand -hex 32)"
 printf 'Bridge token: %s\n' "$BRIDGE_TOKEN"
 npm start
@@ -42,7 +44,7 @@ Keep the bridge bound to `127.0.0.1` when using a local tunnel or proxy; enter t
 
 ---
 
-## 📦 Offline Backup Extractor (Method 2)
+## iPhone backup extractor
 
 ---
 
